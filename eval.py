@@ -3,7 +3,7 @@ import sys
 
 def eval_map_mrr(answer_file, gold_file):
     dic = {}
-    fin = open(gold_file)
+    fin = open(gold_file, encoding='utf-8')
     for line in fin:
         line = line.strip()
         if not line:
@@ -20,7 +20,7 @@ def eval_map_mrr(answer_file, gold_file):
         dic[q_id][a_id] = [cols[6], -1]
     fin.close()
 
-    fin = open(answer_file)
+    fin = open(answer_file, encoding='utf-8')
     for line in fin:
         line = line.strip()
         if not line:

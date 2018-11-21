@@ -13,7 +13,8 @@ def lemmatize():
     for set_name in data_sets:
         fin_path = 'data/raw/WikiQA-{}.tsv'.format(set_name)
         fout_path = 'data/lemmatized/WikiQA-{}.tsv'.format(set_name)
-        with open(fin_path, 'r') as fin, open(fout_path, 'w') as fout:
+
+        with open(fin_path, 'r', encoding='utf-8') as fin, open(fout_path, 'w', encoding='utf-8') as fout:
             fin.readline()
             for line in fin:
                 line_info = line.strip().split('\t')
@@ -41,7 +42,7 @@ def gen_train_triplets(same_q_sample_group):
 
 def gen_train_samples():
     qa_samples = load_qa_data('data/lemmatized/WikiQA-train.tsv')
-    with open('data/lemmatized/WikiQA-train-triplets.tsv', 'w') as fout:
+    with open('data/lemmatized/WikiQA-train-triplets.tsv', 'w', encoding='utf-8') as fout:
         same_q_samples = []
         for qa_sample in qa_samples:
             if len(same_q_samples) == 0 or qa_sample.q_id == same_q_samples[0].q_id:

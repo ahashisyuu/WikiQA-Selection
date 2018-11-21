@@ -20,7 +20,7 @@ class QaSample(object):
 
 
 def load_qa_data(fname):
-    with open(fname, 'r') as fin:
+    with open(fname, 'r', encoding='utf-8') as fin:
         for line in fin:
             try:
                 q_id, question, a_id, answer, label = line.strip().split('\t')
@@ -107,7 +107,7 @@ class DataHelper(object):
         corpus_words = set([word for sample in samples for word in sample.question.split() + sample.answer.split()])
         vocab = []
         embeddings = []
-        with open(embedding_file, 'r') as fin:
+        with open(embedding_file, 'r', encoding='utf-8') as fin:
             for line in fin:
                 try:
                     line_info = line.strip().split()
@@ -139,7 +139,7 @@ class DataHelper(object):
 
     def prepare_train_triplets(self, triplets_file):
         self.train_triplets = []
-        with open(triplets_file, 'r') as fin:
+        with open(triplets_file, 'r', encoding='utf-8') as fin:
             for line in fin:
                 question, pos_ans, neg_ans = line.strip().split('\t')
                 question_ids = list(self.vocab_processor.transform([question]))[0][:self.max_q_length]

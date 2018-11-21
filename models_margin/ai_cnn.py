@@ -18,7 +18,7 @@ class QaCNN(object):
         vocab_size, embedding_size = word_embeddings.shape
         num_filters_total = num_filters * len(filter_sizes)
 
-        with tf.device('/cpu:0'), tf.name_scope('embedding'):
+        with tf.name_scope('embedding'):
             self.embeddings = tf.get_variable("embeddings",
                                               shape=word_embeddings.shape,
                                               initializer=tf.constant_initializer(word_embeddings),
