@@ -54,6 +54,7 @@ def gen_train_samples():
             for question, pos_ans, neg_ans in gen_train_triplets(same_q_samples):
                 fout.write('{}\t{}\t{}\n'.format(question, pos_ans, neg_ans))
 
+
 if __name__ == '__main__':
     lemmatize()
     gen_train_samples()

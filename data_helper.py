@@ -3,6 +3,8 @@
 # author: Yizhong
 # created_at: 16-12-6 下午2:54
 import pickle
+import random
+
 import numpy as np
 from tensorflow.contrib import learn as tf_learn
 
@@ -127,6 +129,7 @@ class DataHelper(object):
 
     def gen_train_batches(self, batch_size):
         data_size = len(self.train_triplets)
+
         num_batches = int((data_size - 1) / batch_size) + 1
         for batch_num in range(num_batches):
             start_index = batch_size * batch_num
@@ -143,6 +146,35 @@ class DataHelper(object):
                 pos_ans_ids = list(self.vocab_processor.transform([pos_ans]))[0][:self.max_a_length]
                 neg_ans_ids = list(self.vocab_processor.transform([neg_ans]))[0][:self.max_a_length]
                 self.train_triplets.append((question_ids, pos_ans_ids, neg_ans_ids))
+        print('train triplets data size is: ', len(self.train_triplets))
+
+    def gen_batches_data(self, batch_size, type='train'):
+        if type == 'train':
+            data = self.train_data
+        elif type == 'dev':
+            data = self.dev_data
+        elif type == 'test':
+            data = self.test_data
+        else:
+            raise ValueError('value error')
+        data_size = len(data)
+
+        num_batches = int((data_size - 1) / batch_size) + 1
+        for batch_num in range(num_batches):
+            start_index = batch_size * batch_num
+            end_index = min(batch_size * (batch_num + 1), data_size)
+            batch = data[start_index: end_index]
+            yield batch
+
+    def prepare_train_data(self, train_file):
+        self.train_samples = list(load_qa_data(train_file))
+        self.train_data = []
+        for sample in self.train_samples:
+            question_ids = list(self.vocab_processor.transform([sample.question]))[0][:self.max_q_length]
+            answer_ids = list(self.vocab_processor.transform([sample.answer]))[0][:self.max_a_length]
+            self.train_data.append((question_ids, answer_ids, sample.label))
+        random.shuffle(self.train_data)
+        print('train data size is: ', len(self.train_data))
 
     def prepare_dev_data(self, dev_file):
         self.dev_samples = list(load_qa_data(dev_file))
@@ -150,7 +182,8 @@ class DataHelper(object):
         for sample in self.dev_samples:
             question_ids = list(self.vocab_processor.transform([sample.question]))[0][:self.max_q_length]
             answer_ids = list(self.vocab_processor.transform([sample.answer]))[0][:self.max_a_length]
-            self.dev_data.append((question_ids, answer_ids))
+            self.dev_data.append((question_ids, answer_ids, sample.label))
+        print('dev data size is: ', len(self.dev_data))
 
     def prepare_test_data(self, test_file):
         self.test_samples = list(load_qa_data(test_file))
@@ -158,4 +191,5 @@ class DataHelper(object):
         for sample in self.test_samples:
             question_ids = list(self.vocab_processor.transform([sample.question]))[0][:self.max_q_length]
             answer_ids = list(self.vocab_processor.transform([sample.answer]))[0][:self.max_a_length]
-            self.test_data.append((question_ids, answer_ids))
+            self.test_data.append((question_ids, answer_ids, sample.label))
+        print('test data size is:', len(self.test_data))

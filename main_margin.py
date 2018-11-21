@@ -6,7 +6,7 @@
 import os
 import argparse
 import tensorflow as tf
-from models.cnn import QaCNN
+from models_margin.cnn import QaCNN
 from data_helper import DataHelper
 from data_helper import get_final_rank
 from eval import eval_map_mrr
@@ -27,10 +27,10 @@ def prepare_helper():
 def train_cnn():
     data_helper = DataHelper()
     data_helper.restore('data/model/data_helper_info.bin')
-    data_helper.prepare_train_data('data/lemmatized/WikiQA-train.tsv')
+    data_helper.prepare_train_triplets('data/lemmatized/WikiQA-train-triplets.tsv')
     data_helper.prepare_dev_data('data/lemmatized/WikiQA-dev.tsv')
     data_helper.prepare_test_data('data/lemmatized/WikiQA-test.tsv')
-    model = QaCNN(
+    cnn_model = QaCNN(
         q_length=data_helper.max_q_length,
         a_length=data_helper.max_a_length,
         word_embeddings=data_helper.embeddings,
@@ -43,7 +43,7 @@ def train_cnn():
     global_step = tf.Variable(0, name='global_step', trainable=False)
 
     optimizer = tf.train.AdamOptimizer(learning_rate=1e-3)
-    train_op = optimizer.minimize(model.loss, global_step=global_step)
+    train_op = optimizer.minimize(cnn_model.loss, global_step=global_step)
 
     checkpoint_dir = os.path.abspath('data/model/checkpoints')
     checkpoint_model_path = os.path.join(checkpoint_dir, 'model.ckpt')
@@ -53,26 +53,26 @@ def train_cnn():
     with tf.Session() as sess:
         summary_writer = tf.summary.FileWriter('data/model/summary', sess.graph)
         sess.run(tf.global_variables_initializer())
-        for epoch in range(30):
+        for epoch in range(10):
             train_loss = 0
-            for batch in data_helper.gen_batches_data(batch_size=15):
-                q_batch, a_batch, label_batch = zip(*batch)
-                _, loss, summaries = sess.run([train_op, model.loss, model.summary_op],
-                                              feed_dict={model.question: q_batch,
-                                                         model.answer: a_batch,
-                                                         model.label: label_batch,
+            for batch in data_helper.gen_train_batches(batch_size=15):
+                q_batch, pos_a_batch, neg_a_batch = zip(*batch)
+                _, loss, summaries = sess.run([train_op, cnn_model.loss, cnn_model.summary_op],
+                                              feed_dict={cnn_model.question: q_batch,
+                                                         cnn_model.pos_answer: pos_a_batch,
+                                                         cnn_model.neg_answer: neg_a_batch,
                                                          })
                 train_loss += loss
                 cur_step = tf.train.global_step(sess, global_step)
                 summary_writer.add_summary(summaries, cur_step)
-                if cur_step % 50 == 0:
+                if cur_step % 20 == 0:
                     # print('Loss: {}'.format(train_loss))
                     # test on dev set
                     q_dev, ans_dev, label_dev = zip(*data_helper.dev_data)
-                    similarity_scores = sess.run(model.similarity, feed_dict={model.question: q_dev,
-                                                                              model.answer: ans_dev,
-                                                                              model.label: label_dev
-                                                                              })
+                    similarity_scores = sess.run(cnn_model.pos_similarity, feed_dict={cnn_model.question: q_dev,
+                                                                                      cnn_model.pos_answer: ans_dev,
+                                                                                      cnn_model.neg_answer: ans_dev,
+                                                                                      })
                     for sample, similarity_score in zip(data_helper.dev_samples, similarity_scores):
                         sample.score = similarity_score
                     with open('data/output/WikiQA-dev.rank'.format(epoch), 'w') as fout:
@@ -90,7 +90,7 @@ def gen_rank_for_test(checkpoint_model_path):
     data_helper = DataHelper()
     data_helper.restore('data/model/data_helper_info.bin')
     data_helper.prepare_test_data('data/lemmatized/WikiQA-test.tsv')
-    model = QaCNN(
+    cnn_model = QaCNN(
         q_length=data_helper.max_q_length,
         a_length=data_helper.max_a_length,
         word_embeddings=data_helper.embeddings,
@@ -104,10 +104,10 @@ def gen_rank_for_test(checkpoint_model_path):
         saver.restore(sess, checkpoint_model_path)
         # test on test set
         q_test, ans_test, label_test = zip(*data_helper.test_data)
-        similarity_scores = sess.run(model.similarity, feed_dict={model.question: q_test,
-                                                                  model.answer: ans_test,
-                                                                  model.label: label_test
-                                                                  })
+        similarity_scores = sess.run(cnn_model.pos_similarity, feed_dict={cnn_model.question: q_test,
+                                                                          cnn_model.pos_answer: ans_test,
+                                                                          cnn_model.neg_answer: ans_test,
+                                                                          })
         for sample, similarity_score in zip(data_helper.test_samples, similarity_scores):
             # print('{}\t{}\t{}'.format(sample.q_id, sample.a_id, similarity_score))
             sample.score = similarity_score
