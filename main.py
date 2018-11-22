@@ -6,7 +6,7 @@
 import os
 import argparse
 import tensorflow as tf
-from models.cnn import QaCNN
+from models.MULT import MULT
 from data_helper import DataHelper
 from data_helper import get_final_rank
 from eval import eval_map_mrr
@@ -30,19 +30,19 @@ def train_cnn():
     data_helper.prepare_train_data('data/lemmatized/WikiQA-train.tsv')
     data_helper.prepare_dev_data('data/lemmatized/WikiQA-dev.tsv')
     data_helper.prepare_test_data('data/lemmatized/WikiQA-test.tsv')
-    model = QaCNN(
+    model = MULT(
         q_length=data_helper.max_q_length,
         a_length=data_helper.max_a_length,
         word_embeddings=data_helper.embeddings,
-        filter_sizes=[1, 2, 3, 5, 7, 9],
-        num_filters=128,
+        filter_sizes=[1, 2, 3, 4, 5],
+        num_filters=150,
         margin=0.25,
         l2_reg_lambda=0
     )
 
     global_step = tf.Variable(0, name='global_step', trainable=False)
 
-    optimizer = tf.train.AdamOptimizer(learning_rate=1e-3)
+    optimizer = tf.train.AdamOptimizer(learning_rate=4e-3)
     train_op = optimizer.minimize(model.loss, global_step=global_step)
 
     checkpoint_dir = os.path.abspath('data/model/checkpoints')
@@ -55,7 +55,8 @@ def train_cnn():
         sess.run(tf.global_variables_initializer())
         for epoch in range(30):
             train_loss = 0
-            for batch in data_helper.gen_batches_data(batch_size=15):
+            for batch in data_helper.gen_batches_data(batch_size=10):
+                sess.run(tf.assign(model.is_train, True))
                 q_batch, a_batch, label_batch = zip(*batch)
                 _, loss, summaries = sess.run([train_op, model.loss, model.summary_op],
                                               feed_dict={model.question: q_batch,
@@ -65,11 +66,12 @@ def train_cnn():
                 train_loss += loss
                 cur_step = tf.train.global_step(sess, global_step)
                 summary_writer.add_summary(summaries, cur_step)
-                if cur_step % 50 == 0:
+                if cur_step % 150 == 0:
                     # print('Loss: {}'.format(train_loss))
                     # test on dev set
+                    sess.run(tf.assign(model.is_train, False))
                     q_dev, ans_dev, label_dev = zip(*data_helper.dev_data)
-                    similarity_scores = sess.run(model.similarity, feed_dict={model.question: q_dev,
+                    similarity_scores = sess.run(model.score, feed_dict={model.question: q_dev,
                                                                               model.answer: ans_dev,
                                                                               model.label: label_dev
                                                                               })
@@ -80,10 +82,11 @@ def train_cnn():
                             fout.write('{}\t{}\t{}\n'.format(sample.q_id, sample.a_id, rank))
                     dev_MAP, dev_MRR = eval_map_mrr('data/output/WikiQA-dev.rank'.format(epoch), 'data/raw/WikiQA-dev.tsv')
                     print('Dev MAP: {}, MRR: {}'.format(dev_MAP, dev_MRR))
-                    # print('{}\t{}\t{}\t{}\t{}\t{}\t{}'.format(epoch, cur_step, train_loss, dev_MAP, dev_MRR, test_MAP, test_MRR))
+                    if dev_MAP > 0.72 or dev_MRR > 0.74:
+                        saver.save(sess, checkpoint_model_path, global_step=cur_step)
                     train_loss = 0
             print('Saving model for epoch {}'.format(epoch))
-            saver.save(sess, checkpoint_model_path, global_step=epoch)
+            # saver.save(sess, checkpoint_model_path, global_step=epoch)
 
 
 def gen_rank_for_test(checkpoint_model_path):

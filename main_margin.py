@@ -30,7 +30,7 @@ def train_cnn():
     data_helper.prepare_train_triplets('data/lemmatized/WikiQA-train-triplets.tsv')
     data_helper.prepare_dev_data('data/lemmatized/WikiQA-dev.tsv')
     data_helper.prepare_test_data('data/lemmatized/WikiQA-test.tsv')
-    cnn_model = QaCNN(
+    model = QaCNN(
         q_length=data_helper.max_q_length,
         a_length=data_helper.max_a_length,
         word_embeddings=data_helper.embeddings,
@@ -43,7 +43,7 @@ def train_cnn():
     global_step = tf.Variable(0, name='global_step', trainable=False)
 
     optimizer = tf.train.AdamOptimizer(learning_rate=1e-3)
-    train_op = optimizer.minimize(cnn_model.loss, global_step=global_step)
+    train_op = optimizer.minimize(model.loss, global_step=global_step)
 
     checkpoint_dir = os.path.abspath('data/model/checkpoints')
     checkpoint_model_path = os.path.join(checkpoint_dir, 'model.ckpt')
@@ -56,11 +56,12 @@ def train_cnn():
         for epoch in range(10):
             train_loss = 0
             for batch in data_helper.gen_train_batches(batch_size=15):
+                sess.run(tf.assign(model.is_train, True))
                 q_batch, pos_a_batch, neg_a_batch = zip(*batch)
-                _, loss, summaries = sess.run([train_op, cnn_model.loss, cnn_model.summary_op],
-                                              feed_dict={cnn_model.question: q_batch,
-                                                         cnn_model.pos_answer: pos_a_batch,
-                                                         cnn_model.neg_answer: neg_a_batch,
+                _, loss, summaries = sess.run([train_op, model.loss, model.summary_op],
+                                              feed_dict={model.question: q_batch,
+                                                         model.pos_answer: pos_a_batch,
+                                                         model.neg_answer: neg_a_batch,
                                                          })
                 train_loss += loss
                 cur_step = tf.train.global_step(sess, global_step)
@@ -68,11 +69,12 @@ def train_cnn():
                 if cur_step % 20 == 0:
                     # print('Loss: {}'.format(train_loss))
                     # test on dev set
+                    sess.run(tf.assign(model.is_train, False))
                     q_dev, ans_dev, label_dev = zip(*data_helper.dev_data)
-                    similarity_scores = sess.run(cnn_model.pos_similarity, feed_dict={cnn_model.question: q_dev,
-                                                                                      cnn_model.pos_answer: ans_dev,
-                                                                                      cnn_model.neg_answer: ans_dev,
-                                                                                      })
+                    similarity_scores = sess.run(model.pos_similarity, feed_dict={model.question: q_dev,
+                                                                                  model.pos_answer: ans_dev,
+                                                                                  model.neg_answer: ans_dev,
+                                                                                  })
                     for sample, similarity_score in zip(data_helper.dev_samples, similarity_scores):
                         sample.score = similarity_score
                     with open('data/output/WikiQA-dev.rank'.format(epoch), 'w') as fout:
@@ -90,7 +92,7 @@ def gen_rank_for_test(checkpoint_model_path):
     data_helper = DataHelper()
     data_helper.restore('data/model/data_helper_info.bin')
     data_helper.prepare_test_data('data/lemmatized/WikiQA-test.tsv')
-    cnn_model = QaCNN(
+    model = QaCNN(
         q_length=data_helper.max_q_length,
         a_length=data_helper.max_a_length,
         word_embeddings=data_helper.embeddings,
@@ -104,10 +106,10 @@ def gen_rank_for_test(checkpoint_model_path):
         saver.restore(sess, checkpoint_model_path)
         # test on test set
         q_test, ans_test, label_test = zip(*data_helper.test_data)
-        similarity_scores = sess.run(cnn_model.pos_similarity, feed_dict={cnn_model.question: q_test,
-                                                                          cnn_model.pos_answer: ans_test,
-                                                                          cnn_model.neg_answer: ans_test,
-                                                                          })
+        similarity_scores = sess.run(model.pos_similarity, feed_dict={model.question: q_test,
+                                                                      model.pos_answer: ans_test,
+                                                                      model.neg_answer: ans_test,
+                                                                      })
         for sample, similarity_score in zip(data_helper.test_samples, similarity_scores):
             # print('{}\t{}\t{}'.format(sample.q_id, sample.a_id, similarity_score))
             sample.score = similarity_score

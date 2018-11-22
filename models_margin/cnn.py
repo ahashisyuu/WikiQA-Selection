@@ -11,13 +11,14 @@ class QaCNN(object):
         self.question = tf.placeholder(tf.int32, [None, q_length], name='question')
         self.pos_answer = tf.placeholder(tf.int32, [None, a_length], name='pos_answer')
         self.neg_answer = tf.placeholder(tf.int32, [None, a_length], name='neg_answer')
+        self.is_train = tf.get_variable('is_train', shape=[], dtype=tf.bool, trainable=False)
 
         l2_reg_loss = tf.constant(0.0)
 
         vocab_size, embedding_size = word_embeddings.shape
         num_filters_total = num_filters * len(filter_sizes)
 
-        with tf.device('/cpu:0'), tf.name_scope('embedding'):
+        with tf.variable_scope('embedding'):
             self.embeddings = tf.get_variable("embeddings",
                                               shape=word_embeddings.shape,
                                               initializer=tf.constant_initializer(word_embeddings),
@@ -32,14 +33,17 @@ class QaCNN(object):
         # conv-pool-drop for question
         pooled_q_outputs = []
         for filter_size in filter_sizes:
+            print(self.embedded_q_expanded)
             with tf.name_scope('ques-conv-pool-{}'.format(filter_size)):
                 # convolution layer
                 filter_shape = [filter_size, embedding_size, 1, num_filters]
+                print('filter shape: ', filter_shape)
                 W = tf.Variable(tf.truncated_normal(filter_shape, stddev=0.1), name='W')
                 b = tf.Variable(tf.constant(0.1, shape=[num_filters]), name='b')
                 conv = tf.nn.conv2d(self.embedded_q_expanded, W, strides=[1, 1, 1, 1], padding='VALID', name='conv')
                 h = tf.nn.relu(tf.nn.bias_add(conv, b), name='relu')
                 pooled = tf.nn.max_pool(h, ksize=[1, q_length-filter_size+1, 1, 1], strides=[1, 1, 1, 1], padding='VALID', name='pool')
+                print(pooled)
                 pooled_q_outputs.append(pooled)
 
         self.q_h_pool = tf.reshape(tf.concat(pooled_q_outputs, 3), [-1, num_filters_total])
@@ -85,4 +89,6 @@ class QaCNN(object):
 
         self.loss_summary = tf.summary.scalar('loss', self.loss)
         self.summary_op = tf.summary.merge_all()
+
+
 
